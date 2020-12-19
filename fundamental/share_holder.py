@@ -1,15 +1,20 @@
 import requests
 from datetime import date, datetime
+from typing import Union, List
+from pandas import DataFrame
+
 from core.equity import Equity
 from bs4 import BeautifulSoup
 
 
-class ShareHolderItem:
+class ShareHolderItem(dict):
     def __init__(self, name: str, quantity: int, pct: float, share_holder_type: str):
-        self.name = name
-        self.quantity = quantity
-        self.pct = pct
-        self.share_holder_type = share_holder_type
+        super().__init__({
+            'name': name,
+            'quantity': quantity,
+            'pct': pct,
+            'share_holder_type': share_holder_type
+        })
 
     @classmethod
     def from_tr_node(cls, tr_node):
@@ -27,20 +32,28 @@ class ShareHolder:
                  equity: Equity = None,
                  due_date: date = None,
                  report_date: date = None,
-                 info: dict = None):
+                 share_holder_df: DataFrame = None):
         self.equity = equity
         self.due_date = due_date
         self.report_date = report_date
-        self.info = info
+        self.share_holder_df = share_holder_df
 
     @classmethod
-    def from_website(cls, equity, due_date: date):
-        url = 'https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CirculateStockHolder/stockid/' \
-              + f'{equity.id}/displaytype/30.phtml'
+    def get_response_from_website(cls, equity: Equity, detailed: bool = False):
+        if detailed:
+            url = f'https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CirculateStockHolder/stockid/{equity.id}.phtml'
+        else:
+            url = 'https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CirculateStockHolder/stockid/' \
+                  + f'{equity.id}/displaytype/30.phtml'
         r = requests.get(url)
         soup = BeautifulSoup(r.text, 'html.parser')
-        share_holder_table = soup.find("table", {"id": "CirculateShareholderTable"})
+        return soup.find("table", {"id": "CirculateShareholderTable"})
+
+    @classmethod
+    def from_website(cls, equity, due_date: date = None, detailed = False) -> Union["ShareHolder", List["ShareHolder"]]:
+        share_holder_table = ShareHolder.get_response_from_website(equity, detailed)
         all_tr = share_holder_table.find_all("tr")
+        return_value = []
         for i in range(len(all_tr)):
             tr = all_tr[i]
             first_td = tr.find("td")
@@ -52,18 +65,20 @@ class ShareHolder:
                     due_date_test = datetime.strptime(
                         tr.find("td", {"class": "tdr", "colspan": "5"}).text,
                         "%Y-%m-%d").date()
-                    if due_date == due_date_test:
-                        report_date = datetime.strptime(
-                            all_tr[i+1].find("td", {"class": "tdr", "colspan": "5"}).text,
-                            "%Y-%m-%d").date()
-                        info = dict()
+                    if due_date == due_date_test or due_date is None:
+                        try:
+                            report_date = datetime.strptime(
+                                all_tr[i+1].find("td", {"class": "tdr", "colspan": "5"}).text,
+                                "%Y-%m-%d").date()
+                        except ValueError:
+                            # old data does not have report date
+                            report_date = None
+
+                        share_holder_records = []
                         for j in range(10):
-                            info[j+1] = ShareHolderItem.from_tr_node(all_tr[i+3+j])
-
-                        return cls(
-                            equity,
-                            due_date,
-                            report_date,
-                            info)
-
-        return cls()
+                            share_holder_records.append(ShareHolderItem.from_tr_node(all_tr[i+3+j]))
+                        return_value.append(
+                            cls(equity, due_date_test, report_date, DataFrame.from_records(share_holder_records)))
+                        if due_date is not None:
+                            break
+        return return_value

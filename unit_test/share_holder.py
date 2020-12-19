@@ -7,7 +7,7 @@ from fundamental.share_holder import ShareHolder
 class MyTestCase(unittest.TestCase):
     def test_from_website_1(self):
         equity = Equity(603290, "斯达半导")
-        share_holder = ShareHolder.from_website(equity, date(2020, 9, 30))
+        share_holder = ShareHolder.from_website(equity, date(2020, 9, 30))[0]
         target_share_holders = [
             {'name': '中国工商银行股份有限公司－融通中国风1号灵活配置混合型证券投资基金', 'quantity': 1146295, 'pct': 2.866, 'share_holder_type': '境内法人股'},
             {'name': '招商银行股份有限公司－银河创新成长混合型证券投资基金', 'quantity': 900891, 'pct': 2.252, 'share_holder_type': '境内法人股'},
@@ -22,11 +22,11 @@ class MyTestCase(unittest.TestCase):
         ]
         self.assertEqual(date(2020, 9, 30), share_holder.due_date)
         self.assertEqual(date(2020, 10, 30), share_holder.report_date)
-        self.assertEqual(target_share_holders, [x.__dict__ for x in share_holder.info.values()])
+        self.assertEqual(target_share_holders, share_holder.share_holder_df.to_dict('records'))
 
     def test_from_website_2(self):
         equity = Equity(603290, "斯达半导")
-        share_holder = ShareHolder.from_website(equity, date(2020, 6, 30))
+        share_holder = ShareHolder.from_website(equity, date(2020, 6, 30))[0]
         target_share_holders = [
             {'name': 'MORGAN STANLEY&CO.INTERNATIONAL PLC.', 'quantity': 1193279, 'pct': 2.983, 'share_holder_type': '境外法人股'},
             {'name': '中国建设银行股份有限公司－易方达信息产业混合型证券投资基金', 'quantity': 874500, 'pct': 2.186, 'share_holder_type': '境内法人股'},
@@ -42,7 +42,13 @@ class MyTestCase(unittest.TestCase):
 
         self.assertEqual(date(2020, 6, 30), share_holder.due_date)
         self.assertEqual(date(2020, 8, 28), share_holder.report_date)
-        self.assertEqual(target_share_holders, [x.__dict__ for x in share_holder.info.values()])
+        self.assertEqual(target_share_holders, share_holder.share_holder_df.to_dict('records'))
+
+    def test_from_website_3(self):
+        equity = Equity(600028, "中国石化")
+        share_holder_1 = ShareHolder.from_website(equity, None, True)
+        share_holder_2 = ShareHolder.from_website(equity, None, False)
+        self.assertNotEqual(len(share_holder_1), len(share_holder_2))
 
 
 if __name__ == '__main__':
