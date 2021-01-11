@@ -4,6 +4,7 @@ from typing import List
 from pandas import DataFrame
 
 from core.equity import Equity
+from core.date import DateUtility
 from bs4 import BeautifulSoup
 
 
@@ -85,13 +86,13 @@ class ShareHolder:
             strong_node = due_date_td.find("strong")
             if strong_node is not None and len(strong_node) > 0:
                 if (is_circulate and strong_node.text == "截止日期") or (not is_circulate and strong_node.text == "截至日期"):
-                    actual_due_date = datetime.strptime(due_date_td.find_next("td").text, "%Y-%m-%d").date()
+                    actual_due_date = DateUtility.date_from_string(due_date_td.find_next("td").text)
                     if due_date == actual_due_date or due_date is None:
                         report_date_tr = all_tr[i + 1]
                         report_date_td = report_date_tr.find("td")
                         assert report_date_td.text == "公告日期", "Current TR is not report date TR."
                         try:
-                            report_date = datetime.strptime(report_date_td.find_next("td").text, "%Y-%m-%d").date()
+                            report_date = DateUtility.date_from_string(report_date_td.find_next("td").text)
                         except ValueError:
                             # old data does not have report date
                             report_date = None
@@ -123,3 +124,45 @@ class ShareHolder:
                         if due_date is not None:
                             break
         return return_value
+
+    @classmethod
+    def get_count_history(cls, equity: Equity):
+        url = f"https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_StockHolderAmount/code/{equity.id}/type/amount.phtml"
+        r = requests.get(url)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        count_history_table = soup.find("table", {"id": "Table1"})
+        all_tr = count_history_table.find_all("tr")
+        return_value = []
+        header_list = ["截止日期", "股东户数", "比上期变化情况"]
+        for i in range(len(all_tr)):
+            if i == 0:
+                # get the header of the count table
+                all_ths = all_tr[i].find_all("th")
+                assert len(all_ths) == 3, 'Count history header should have three elements.'
+                for j in range(3):
+                    assert all_ths[j].find("strong").text == header_list[j]
+            else:
+                all_tds = all_tr[i].find_all("td")
+                count_str = all_tds[1].text
+                try:
+                    int(count_str)
+                except ValueError:
+                    assert count_str == "未知", "Count string error."
+                    continue
+
+                # if all_tds[2].text[:2] == "新增":
+                #     sign = 1.0
+                # elif all_tds[2].text[:2] == "减少":
+                #     sign = -1.0
+                # else:
+                #     print(DateUtility.date_from_string(all_tds[0].text))
+                #     raise ValueError(f"{all_tds[2].text[:2]} not increase or decrease.")
+
+                return_value.append(
+                    {
+                        header_list[0]: DateUtility.date_from_string(all_tds[0].text),
+                        header_list[1]: int(count_str),
+                        # header_list[2]: sign * int(all_tds[2].text[2:]),
+                    }
+                )
+        return DataFrame.from_records(return_value)

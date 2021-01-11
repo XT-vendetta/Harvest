@@ -81,6 +81,15 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(url3, 'https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CirculateStockHolder/stockid/600028/displaytype/30.phtml')
         self.assertEqual(url4, 'https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_StockHolder/stockid/600028/displaytype/30.phtml')
 
+    def test_get_count_history(self):
+        equity = Equity(600028, "中国石化")
+        count_history = ShareHolder.get_count_history(equity)
+        self.assertEqual(list(count_history.loc[count_history["截止日期"] == date(2020, 9, 30)]["股东户数"])[0], 571928)
+        self.assertEqual(list(count_history.loc[count_history["截止日期"] == date(2020, 6, 30)]["股东户数"])[0], 563689)
+        self.assertEqual(list(count_history.loc[count_history["截止日期"] == date(2020, 3, 31)]["股东户数"])[0], 553217)
+        self.assertEqual(list(count_history.loc[count_history["截止日期"] == date(2019, 12, 31)]["股东户数"])[0], 478617)
+        self.assertEqual(list(count_history.loc[count_history["截止日期"] == date(2019, 9, 30)]["股东户数"])[0], 502791)
+
 
 if __name__ == '__main__':
     unittest.main()
