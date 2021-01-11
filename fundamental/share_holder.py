@@ -144,6 +144,11 @@ class ShareHolder:
             else:
                 all_tds = all_tr[i].find_all("td")
                 count_str = all_tds[1].text
+
+                # If unchanged then skip
+                if all_tds[2].text == "不变":
+                    continue
+
                 try:
                     int(count_str)
                 except ValueError:
